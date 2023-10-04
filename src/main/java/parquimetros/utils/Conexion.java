@@ -1,8 +1,6 @@
 package parquimetros.utils;
 
 import java.io.FileInputStream;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -52,7 +50,7 @@ public class Conexion {
     /**
      * Inicializa los parámetros de conexión con los valores definidos en el archivo de propiedades pasado como parámetro
      * 
-     * @param property Archivo de propiedades con la ruta
+     * @param propertyFile Archivo de propiedades con la ruta
      */
 	public static void inicializar(String propertyFile)	
 	{

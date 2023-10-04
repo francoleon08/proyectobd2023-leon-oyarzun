@@ -26,45 +26,38 @@ public class ModeloImpl implements Modelo {
 	@Override
 	public void desconectar() {
 		logger.info("Se desconecta la conexión a la BD.");
-		Conexion.closeConnection(this.conexion);		
+		Conexion.closeConnection(this.conexion);
 	}
 
 	@Override
 	public ResultSet consulta(String sql)	       		
 	{
 		logger.info("Se intenta realizar la siguiente consulta {}",sql);
-		
-		/** TODO: ejecutar la consulta sql recibida como parámetro utilizando 
-		*         la propiedad conexion y devolver el resultado en un ResulSet
-		*/
-		/* 
 		try
-		{ 
-		 
+		{
+			Statement stmt = conexion.createStatement();
+			return  stmt.executeQuery(sql);
 		}
 		catch (SQLException ex){
 		   logger.error("SQLException: " + ex.getMessage());
 		   logger.error("SQLState: " + ex.getSQLState());
 		   logger.error("VendorError: " + ex.getErrorCode());
 		}
-		*/
 		return null;
 	}	
 	
 	@Override
 	public void actualizacion (String sql)
-	{  /** TODO: ejecutar la consulta de actualizacion sql recibida como 
- 		*       parámetro utilizando la propiedad conexion 
-		*/  
-		/*
-		try
-		{ 	
+	{
+		try {
+			Statement stmt = this.conexion.createStatement();
+			stmt.executeUpdate(sql);
+			stmt.close();
 		}
 		catch (SQLException ex) {
 			logger.error("SQLException: " + ex.getMessage());
 			logger.error("SQLState: " + ex.getSQLState());
 			logger.error("VendorError: " + ex.getErrorCode());
 		}
-		*/
 	}	
 }

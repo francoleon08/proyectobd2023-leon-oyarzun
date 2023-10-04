@@ -27,7 +27,10 @@ public class ModeloLoginImpl implements ModeloLogin {
 	
 	private HashMap<String,UsuarioBean> usuarios = new HashMap<String,UsuarioBean>();
 	
-	public ModeloLoginImpl() {		
+	public ModeloLoginImpl() {
+		//Conexion a la base de datos
+		Conexion.inicializar(CONEXION_FILE);
+
 		/*
 		 * Cargamos del archivo de propiedades los usuarios de MySQL que vamos utilizar para conectarnos a la B.D.
 		 */
