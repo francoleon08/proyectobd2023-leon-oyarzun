@@ -1,6 +1,8 @@
 package parquimetros.modelo.beans;
 
-public interface ConductorBean {
+import java.io.Serializable;
+
+public interface ConductorBean extends Serializable {
 
 	public int getNroDocumento();
 

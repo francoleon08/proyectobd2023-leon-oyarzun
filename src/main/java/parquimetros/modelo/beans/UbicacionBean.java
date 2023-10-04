@@ -1,6 +1,8 @@
 package parquimetros.modelo.beans;
 
-public interface UbicacionBean {
+import java.io.Serializable;
+
+public interface UbicacionBean extends Serializable {
 
 	/**
 	 * @return La calle

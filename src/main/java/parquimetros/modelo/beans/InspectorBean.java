@@ -1,6 +1,8 @@
 package parquimetros.modelo.beans;
 
-public interface InspectorBean {
+import java.io.Serializable;
+
+public interface InspectorBean extends Serializable {
 	
 	/**
 	 * @return el legajo
@@ -8,7 +10,7 @@ public interface InspectorBean {
 	int getLegajo();
 
 	/**
-	 * @param Legajo
+	 * @param legajo
 	 */
 	void setLegajo(int legajo);
 

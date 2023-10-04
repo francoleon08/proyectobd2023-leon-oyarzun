@@ -1,6 +1,8 @@
 package parquimetros.modelo.login.beans;
 
-public interface UsuarioBean {
+import java.io.Serializable;
+
+public interface UsuarioBean extends Serializable {
 	
 	public String getUsername();
 	public String getPassword();

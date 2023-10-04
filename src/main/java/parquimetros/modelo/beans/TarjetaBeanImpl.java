@@ -1,58 +1,22 @@
 package parquimetros.modelo.beans;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
+
+@Getter @Setter
 public class TarjetaBeanImpl implements TarjetaBean {
 	
 	private static Logger logger = LoggerFactory.getLogger(TarjetaBeanImpl.class);
-	
 	private static final long serialVersionUID = 1L;
 
 	private int id;
 	private double saldo;
 	private TipoTarjetaBean tipoTarjeta;
 	private AutomovilBean automovil;
-
-	@Override
-	public int getId() {
-		return this.id;
-	}
-	
-	@Override
-	public void setId(int id) {
-		this.id=id;
-	}
-
-	@Override
-	public double getSaldo() {
-		return this.saldo;
-	}
-
-	@Override
-	public void setSaldo(double saldo) {
-		this.saldo=saldo;
-	}
-
-	@Override
-	public TipoTarjetaBean getTipoTarjeta() {
-		return this.tipoTarjeta;
-	}
-
-	@Override
-	public void setTipoTarjeta(TipoTarjetaBean tipo) {
-		this.tipoTarjeta=tipo;
-	}
-
-	@Override
-	public AutomovilBean getAutomovil() {
-		return this.automovil;
-	}
-
-	@Override
-	public void setAutomovil(AutomovilBean automovil) {
-		this.automovil=automovil;
-	}
 
 	@Override
 	public String toString() {

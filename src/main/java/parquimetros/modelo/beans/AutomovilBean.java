@@ -1,6 +1,8 @@
 package parquimetros.modelo.beans;
 
-public interface AutomovilBean {
+import java.io.Serializable;
+
+public interface AutomovilBean extends Serializable {
 
 	ConductorBean getConductor();
 

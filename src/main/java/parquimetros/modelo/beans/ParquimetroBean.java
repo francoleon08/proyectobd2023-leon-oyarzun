@@ -1,6 +1,8 @@
 package parquimetros.modelo.beans;
 
-public interface ParquimetroBean {
+import java.io.Serializable;
+
+public interface ParquimetroBean extends Serializable {
 
 	int getId();
 

@@ -1,6 +1,8 @@
 package parquimetros.modelo.beans;
 
-public interface TipoTarjetaBean {
+import java.io.Serializable;
+
+public interface TipoTarjetaBean extends Serializable {
 
 	public String getTipo();
 
