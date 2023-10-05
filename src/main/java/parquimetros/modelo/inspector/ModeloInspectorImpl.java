@@ -1,29 +1,23 @@
 package parquimetros.modelo.inspector;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import parquimetros.modelo.ModeloImpl;
-import parquimetros.modelo.beans.InspectorBean;
-import parquimetros.modelo.beans.ParquimetroBean;
-import parquimetros.modelo.beans.UbicacionBean;
+import parquimetros.modelo.beans.*;
 import parquimetros.modelo.inspector.dao.DAOParquimetro;
 import parquimetros.modelo.inspector.dao.DAOParquimetroImpl;
 import parquimetros.modelo.inspector.dao.DAOInspector;
 import parquimetros.modelo.inspector.dao.DAOInspectorImpl;
 import parquimetros.modelo.inspector.dao.DAOAutomovil;
 import parquimetros.modelo.inspector.dao.DAOAutomovilImpl;
-import parquimetros.modelo.inspector.dao.datosprueba.DAOParquimetrosDatosPrueba;
-import parquimetros.modelo.inspector.dao.datosprueba.DAOUbicacionesDatosPrueba;
 import parquimetros.modelo.inspector.dto.EstacionamientoPatenteDTO;
 import parquimetros.modelo.inspector.dto.EstacionamientoPatenteDTOImpl;
 import parquimetros.modelo.inspector.dto.MultaPatenteDTO;
@@ -55,80 +49,149 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 	
 	@Override
 	public ArrayList<UbicacionBean> recuperarUbicaciones() throws Exception {
-		
 		logger.info(Mensajes.getMessage("ModeloInspectorImpl.recuperarUbicaciones.logger"));
-		/** 
-		 * TODO Debe retornar una lista de UbicacionesBean con todas las ubicaciones almacenadas en la B.D. 
-		 *      Debería propagar una excepción si hay algún error en la consulta. 
-		 *      
-		 *      Importante: Para acceder a la B.D. utilice la propiedad this.conexion (de clase Connection) 
-		 *      que se hereda al extender la clase ModeloImpl.       
-		 *      
-		 */
 		ArrayList<UbicacionBean> ubicaciones = new ArrayList<UbicacionBean>();
 
-		// Datos estáticos de prueba. Quitar y reemplazar por código que recupera las ubicaciones de la B.D. en una lista de UbicacionesBean		 
-		DAOUbicacionesDatosPrueba.poblar();
-		
-		for (UbicacionBean ubicacion : DAOUbicacionesDatosPrueba.datos.values()) {
-			ubicaciones.add(ubicacion);	
+		try {
+			String query = "SELECT * FROM parquimetros.ubicaciones;";
+			Statement st = this.conexion.createStatement();
+			ResultSet rs = st.executeQuery(query);
+
+			while (rs.next()) {
+				UbicacionBean ubicacion = new UbicacionBeanImpl();
+				ubicacion.setCalle(rs.getString("calle"));
+				ubicacion.setAltura(rs.getInt("altura"));
+				ubicacion.setTarifa(rs.getDouble("tarifa"));
+
+				ubicaciones.add(ubicacion);
+			}
+		} catch (SQLException ex)
+		{
+			logger.error("SQLException: " + ex.getMessage());
+			logger.error("SQLState: " + ex.getSQLState());
+			logger.error("VendorError: " + ex.getErrorCode());
+			throw new Exception("Error inesperado al consultar la B.D.");
 		}
-		// Fin datos estáticos de prueba.
 	
 		return ubicaciones;
 	}
 
 	@Override
 	public ArrayList<ParquimetroBean> recuperarParquimetros(UbicacionBean ubicacion) throws Exception {
-		
 		logger.info(Mensajes.getMessage("ModeloInspectorImpl.recuperarParquimetros.logger"),ubicacion.toString());
-		
-		/** 
-		 * TODO Debe retornar una lista de ParquimetroBean con todos los parquimetros que corresponden a una ubicación.
-		 * 		Debería propagar una excepción si hay algún error en la consulta.
-		 *            
-		 *      Importante: Para acceder a la B.D. utilice la propiedad this.conexion (de clase Connection) 
-		 *      que se hereda al extender la clase ModeloImpl.      
-		 *      
-		 */
-
 		ArrayList<ParquimetroBean> parquimetros = new ArrayList<ParquimetroBean>();
 
-		// Datos estáticos de prueba. Quitar y reemplazar por código que recupera los parquimetros de la B.D. en una lista de ParquimetroBean
-		DAOParquimetrosDatosPrueba.poblar(ubicacion);
-		
-		for (ParquimetroBean parquimetro : DAOParquimetrosDatosPrueba.datos.values()) {
-			parquimetros.add(parquimetro);	
+		try {
+			String query = "SELECT * FROM parquimetros.parquimetros P WHERE P.calle = '"+ubicacion.getCalle()+"' AND P.altura = "+ubicacion.getAltura()+";";
+			Statement st = this.conexion.createStatement();
+			ResultSet rs = st.executeQuery(query);
+
+			while (rs.next()) {
+				ParquimetroBean parquimetro = new ParquimetroBeanImpl();
+				parquimetro.setId(rs.getInt("id_parq"));
+				parquimetro.setNumero(rs.getInt("numero"));
+				parquimetro.setUbicacion(ubicacion);
+
+				parquimetros.add(parquimetro);
+			}
+		} catch (SQLException ex)
+		{
+			logger.error("SQLException: " + ex.getMessage());
+			logger.error("SQLState: " + ex.getSQLState());
+			logger.error("VendorError: " + ex.getErrorCode());
+			throw new Exception("Error inesperado al consultar la B.D.");
 		}
-		// Fin datos estáticos de prueba.
 	
 		return parquimetros;
 	}
 
 	@Override
 	public void conectarParquimetro(ParquimetroBean parquimetro, InspectorBean inspectorLogueado) throws ConexionParquimetroException, Exception {
-		// es llamado desde Controlador.conectarParquimetro
-  
 		logger.info(Mensajes.getMessage("ModeloInspectorImpl.conectarParquimetro.logger"),parquimetro.toString());
-		
-		/** TODO Simula la conexión al parquímetro con el inspector que se encuentra logueado en el momento 
-		 *       en que se ejecuta la acción. 
-		 *       
-		 *       Debe verificar si el inspector está habilitado a acceder a la ubicación del parquímetro 
-		 *       en el dia y hora actual, segun la tabla asociado_con. 
-		 *       Sino puede deberá producir una excepción ConexionParquimetroException.     
-		 *       En caso exitoso se registra su acceso en la tabla ACCEDE y retorna exitosamente.		         
-		 *     
-		 *       Si hay un error no controlado se produce una Exception genérica.
-		 *       
-		 *       Importante: Para acceder a la B.D. utilice la propiedad this.conexion (de clase Connection) 
-		 *       que se hereda al extender la clase ModeloImpl.
-		 *  
-		 * @param parquimetro
-		 * @throws ConexionParquimetroException
-		 * @throws Exception
-		 */		
-		
+
+		String [] fechaHora = getDiaTurnoFechaHora();
+		String query = String.format("SELECT EXISTS (SELECT * FROM parquimetros.asociado_con A WHERE A.legajo = %d AND A.calle = '%s' AND A.altura = %d AND A.dia = '%s' AND A.turno = '%s');", inspectorLogueado.getLegajo(), parquimetro.getUbicacion().getCalle(), parquimetro.getUbicacion().getAltura(), fechaHora[0], fechaHora[1]);
+
+		try {
+			Statement st = this.conexion.createStatement();
+			ResultSet rs = st.executeQuery(query);
+
+			while (rs.next()) {
+				if(!rs.getBoolean(1)){
+					throw new ConexionParquimetroException("Error: inspector fuera de turno/horario/ubicacion.");
+				}
+				else {
+					query = String.format("INSERT INTO parquimetros.accede VALUES (%d, '%s', '%s', %d);", parquimetro.getId(), fechaHora[2], fechaHora[3], inspectorLogueado.getLegajo());
+					this.conexion.createStatement().execute(query);
+				}
+			}
+		} catch (SQLException ex)
+		{
+			logger.error("SQLException: " + ex.getMessage());
+			logger.error("SQLState: " + ex.getSQLState());
+			logger.error("VendorError: " + ex.getErrorCode());
+			throw new Exception("Error inesperado al consultar la B.D.");
+		}
+	}
+
+	/**
+	 * Arreglo Strings donde [0] corresponde al dia de la semana, [1] al turno,
+	 * [2] a la fecha actual y [3] a la hora actual.
+	 * @return String []
+	 */
+	private String [] getDiaTurnoFechaHora() {
+		LocalDateTime currentDateTime = LocalDateTime.now();
+		int hora = Integer.parseInt(currentDateTime.format(DateTimeFormatter.ofPattern("HH")));
+		Calendar calendario = Calendar.getInstance();
+		int dia = calendario.get(Calendar.DAY_OF_WEEK);
+		String fecha = "";
+		String horaRet = "";
+
+		DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+		DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+
+		String fechaAhora = currentDateTime.format(dateFormatter);
+		String horaAhora = currentDateTime.format(timeFormatter);
+
+		if(hora >= 8 && hora <14){
+			horaRet = "m";
+		} else {
+			if(hora >= 14 && hora <20){
+				horaRet = "t";
+			}
+		}
+
+		switch (dia) {
+			case 1: {
+				fecha = "do";
+				break;
+			}
+			case 2: {
+				fecha = "lu";
+				break;
+			}
+			case 3: {
+				fecha = "ma";
+				break;
+			}
+			case 4: {
+				fecha = "mi";
+				break;
+			}
+			case 5: {
+				fecha = "ju";
+				break;
+			}
+			case 6: {
+				fecha = "vi";
+				break;
+			}
+			case 7: {
+				fecha = "sa";
+				break;
+			}
+		}
+		return new String[]{fecha, horaRet, fechaAhora, horaAhora};
 	}
 
 	@Override
