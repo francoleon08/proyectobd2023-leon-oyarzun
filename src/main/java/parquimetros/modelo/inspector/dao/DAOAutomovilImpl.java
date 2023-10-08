@@ -1,11 +1,11 @@
 package parquimetros.modelo.inspector.dao;
 
-import java.sql.Connection;
+import java.sql.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import parquimetros.modelo.inspector.exception.AutomovilNoEncontradoException;
-import parquimetros.utils.Mensajes;
 
 public class DAOAutomovilImpl implements DAOAutomovil {
 
@@ -17,32 +17,25 @@ public class DAOAutomovilImpl implements DAOAutomovil {
 		this.conexion = conexion;
 	}
 
+
 	@Override
 	public void verificarPatente(String patente) throws AutomovilNoEncontradoException, Exception {
-		/** 
-		 * TODO Debe verificar que exista la patente en la tabla automoviles. 
-		 * 		Deberá generar una excepción AutomovilNoEncontradoException en caso de no encontrarlo. 
-		 *      Si hay algún error en la consulta o en la conexión deberá propagar la excepción.    
-		 *       
-		 *      Importante: Para acceder a la B.D. utilice la propiedad this.conexion (de clase Connection) 
-		 *      que se inicializa en el constructor.     
-		 */
-		//Datos estáticos de prueba. Quitar y reemplazar por código que recupera los datos reales.
-		//
-		// Diseño de datos de prueba: Las patentes que terminan en 
-		//  * 1 al 8 retorna exitosamente
-		//  * 9 produce una excepción de AutomovilNoEncontradoException
-		//  * 0 propaga la excepción recibida (produce una Exception)
- 		// 
-	
-		int ultimo = Integer.parseInt(patente.substring(patente.length()-1));
-		
-		if (ultimo == 0) {
-			throw new Exception("Hubo un error en la conexión.");
-		} else if (ultimo == 9) {
-			throw new AutomovilNoEncontradoException(Mensajes.getMessage("DAOAutomovilImpl.recuperarAutomovilPorPatente.AutomovilNoEncontradoException"));			
-		} 
-		// Fin datos estáticos de prueba.		
-	}
+		logger.info("Se busca en la base de datos si la patente [?] se encuentra registrada.", patente);
 
+		String query = "SELECT EXISTS (SELECT A.patente FROM parquimetros.automoviles A WHERE A.patente = ?)";
+
+		try (PreparedStatement st = this.conexion.prepareStatement(query)) {
+			st.setString(1, patente);
+			try (ResultSet rs = st.executeQuery()) {
+				if (rs.next() && !rs.getBoolean(1)) {
+					throw new AutomovilNoEncontradoException("La patente no se encuentra registrada.");
+				}
+			}
+		} catch (SQLException ex) {
+			logger.error("SQLException: " + ex.getMessage());
+			logger.error("SQLState: " + ex.getSQLState());
+			logger.error("VendorError: " + ex.getErrorCode());
+			throw new Exception("Error inesperado al consultar la B.D.");
+		}
+	}
 }
