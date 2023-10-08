@@ -4,6 +4,8 @@ import java.sql.Date;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Calendar;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,6 +141,66 @@ public class Fechas
   					p_fecha.charAt(5) + p_fecha.charAt(6) +"/"+
   					p_fecha.charAt(0) + p_fecha.charAt(1) + p_fecha.charAt(2) + p_fecha.charAt(3));
 	   }
+   }
+
+   /**
+    * Arreglo Strings donde [0] corresponde al dia de la semana, [1] al turno,
+    * [2] a la fecha actual y [3] a la hora actual.
+    * @return String []
+    */
+   public static String [] getDiaTurnoFechaHora() {
+      LocalDateTime currentDateTime = LocalDateTime.now();
+      int hora = Integer.parseInt(currentDateTime.format(DateTimeFormatter.ofPattern("HH")));
+      Calendar calendario = Calendar.getInstance();
+      int dia = calendario.get(Calendar.DAY_OF_WEEK);
+      String fecha = "";
+      String horaRet = "";
+
+      DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+      DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+
+      String fechaAhora = currentDateTime.format(dateFormatter);
+      String horaAhora = currentDateTime.format(timeFormatter);
+
+      if(hora >= 8 && hora <14){
+         horaRet = "m";
+      } else {
+         if(hora >= 14 && hora <20){
+            horaRet = "t";
+         }
+      }
+
+      switch (dia) {
+         case 1: {
+            fecha = "do";
+            break;
+         }
+         case 2: {
+            fecha = "lu";
+            break;
+         }
+         case 3: {
+            fecha = "ma";
+            break;
+         }
+         case 4: {
+            fecha = "mi";
+            break;
+         }
+         case 5: {
+            fecha = "ju";
+            break;
+         }
+         case 6: {
+            fecha = "vi";
+            break;
+         }
+         case 7: {
+            fecha = "sa";
+            break;
+         }
+      }
+      return new String[]{fecha, horaRet, fechaAhora, horaAhora};
    }
    
 }

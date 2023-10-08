@@ -1,10 +1,10 @@
 package parquimetros.modelo.inspector;
 
 import java.sql.*;
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Objects;
 
 import org.slf4j.Logger;
@@ -26,6 +26,7 @@ import parquimetros.modelo.inspector.exception.AutomovilNoEncontradoException;
 import parquimetros.modelo.inspector.exception.ConexionParquimetroException;
 import parquimetros.modelo.inspector.exception.InspectorNoAutenticadoException;
 import parquimetros.modelo.inspector.exception.InspectorNoHabilitadoEnUbicacionException;
+import parquimetros.utils.Fechas;
 import parquimetros.utils.Mensajes;
 
 public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
@@ -51,11 +52,10 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 	public ArrayList<UbicacionBean> recuperarUbicaciones() throws Exception {
 		logger.info(Mensajes.getMessage("ModeloInspectorImpl.recuperarUbicaciones.logger"));
 		ArrayList<UbicacionBean> ubicaciones = new ArrayList<UbicacionBean>();
+		String query = "SELECT * FROM parquimetros.ubicaciones;";
 
-		try {
-			String query = "SELECT * FROM parquimetros.ubicaciones;";
-			Statement st = this.conexion.createStatement();
-			ResultSet rs = st.executeQuery(query);
+		try (Statement st = this.conexion.createStatement();
+			 ResultSet rs = st.executeQuery(query)) {
 
 			while (rs.next()) {
 				UbicacionBean ubicacion = new UbicacionBeanImpl();
@@ -72,7 +72,7 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 			logger.error("VendorError: " + ex.getErrorCode());
 			throw new Exception("Error inesperado al consultar la B.D.");
 		}
-	
+
 		return ubicaciones;
 	}
 
@@ -80,19 +80,21 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 	public ArrayList<ParquimetroBean> recuperarParquimetros(UbicacionBean ubicacion) throws Exception {
 		logger.info(Mensajes.getMessage("ModeloInspectorImpl.recuperarParquimetros.logger"),ubicacion.toString());
 		ArrayList<ParquimetroBean> parquimetros = new ArrayList<ParquimetroBean>();
+		String query = "SELECT * FROM parquimetros.parquimetros P WHERE P.calle = ? AND P.altura = ?;";
 
-		try {
-			String query = "SELECT * FROM parquimetros.parquimetros P WHERE P.calle = '"+ubicacion.getCalle()+"' AND P.altura = "+ubicacion.getAltura()+";";
-			Statement st = this.conexion.createStatement();
-			ResultSet rs = st.executeQuery(query);
+		try (PreparedStatement st = this.conexion.prepareStatement(query)){
+			st.setString(1, ubicacion.getCalle());
+			st.setInt(2, ubicacion.getAltura());
 
-			while (rs.next()) {
-				ParquimetroBean parquimetro = new ParquimetroBeanImpl();
-				parquimetro.setId(rs.getInt("id_parq"));
-				parquimetro.setNumero(rs.getInt("numero"));
-				parquimetro.setUbicacion(ubicacion);
+			try (ResultSet rs = st.executeQuery()) {
+				while (rs.next()) {
+					ParquimetroBean parquimetro = new ParquimetroBeanImpl();
+					parquimetro.setId(rs.getInt("id_parq"));
+					parquimetro.setNumero(rs.getInt("numero"));
+					parquimetro.setUbicacion(ubicacion);
 
-				parquimetros.add(parquimetro);
+					parquimetros.add(parquimetro);
+				}
 			}
 		} catch (SQLException ex)
 		{
@@ -109,89 +111,24 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 	public void conectarParquimetro(ParquimetroBean parquimetro, InspectorBean inspectorLogueado) throws ConexionParquimetroException, Exception {
 		logger.info(Mensajes.getMessage("ModeloInspectorImpl.conectarParquimetro.logger"),parquimetro.toString());
 
-		String [] fechaHora = getDiaTurnoFechaHora();
-		String query = String.format("SELECT EXISTS (SELECT * FROM parquimetros.asociado_con A WHERE A.legajo = %d AND A.calle = '%s' AND A.altura = %d AND A.dia = '%s' AND A.turno = '%s');", inspectorLogueado.getLegajo(), parquimetro.getUbicacion().getCalle(), parquimetro.getUbicacion().getAltura(), fechaHora[0], fechaHora[1]);
+		String[] fechaHora = Fechas.getDiaTurnoFechaHora();
+		String queryInsert = "INSERT INTO parquimetros.accede VALUES (?, ?, ?, ?)";
 
-		try {
-			Statement st = this.conexion.createStatement();
-			ResultSet rs = st.executeQuery(query);
+		try (PreparedStatement stInsert = this.conexion.prepareStatement(queryInsert)) {
+			checkInspectorHabilitado(parquimetro.getUbicacion(), inspectorLogueado);
 
-			while (rs.next()) {
-				if(!rs.getBoolean(1)){
-					throw new ConexionParquimetroException("Error: inspector fuera de turno/horario/ubicacion.");
-				}
-				else {
-					query = String.format("INSERT INTO parquimetros.accede VALUES (%d, '%s', '%s', %d);", parquimetro.getId(), fechaHora[2], fechaHora[3], inspectorLogueado.getLegajo());
-					this.conexion.createStatement().execute(query);
-				}
-			}
-		} catch (SQLException ex)
-		{
+			stInsert.setInt(1, parquimetro.getId());
+			stInsert.setString(2, fechaHora[2]);
+			stInsert.setString(3, fechaHora[3]);
+			stInsert.setInt(4, inspectorLogueado.getLegajo());
+
+			stInsert.executeUpdate();
+		} catch (SQLException ex) {
 			logger.error("SQLException: " + ex.getMessage());
 			logger.error("SQLState: " + ex.getSQLState());
 			logger.error("VendorError: " + ex.getErrorCode());
 			throw new Exception("Error inesperado al consultar la B.D.");
 		}
-	}
-
-	/**
-	 * Arreglo Strings donde [0] corresponde al dia de la semana, [1] al turno,
-	 * [2] a la fecha actual y [3] a la hora actual.
-	 * @return String []
-	 */
-	private String [] getDiaTurnoFechaHora() {
-		LocalDateTime currentDateTime = LocalDateTime.now();
-		int hora = Integer.parseInt(currentDateTime.format(DateTimeFormatter.ofPattern("HH")));
-		Calendar calendario = Calendar.getInstance();
-		int dia = calendario.get(Calendar.DAY_OF_WEEK);
-		String fecha = "";
-		String horaRet = "";
-
-		DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-		DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
-
-		String fechaAhora = currentDateTime.format(dateFormatter);
-		String horaAhora = currentDateTime.format(timeFormatter);
-
-		if(hora >= 8 && hora <14){
-			horaRet = "m";
-		} else {
-			if(hora >= 14 && hora <20){
-				horaRet = "t";
-			}
-		}
-
-		switch (dia) {
-			case 1: {
-				fecha = "do";
-				break;
-			}
-			case 2: {
-				fecha = "lu";
-				break;
-			}
-			case 3: {
-				fecha = "ma";
-				break;
-			}
-			case 4: {
-				fecha = "mi";
-				break;
-			}
-			case 5: {
-				fecha = "ju";
-				break;
-			}
-			case 6: {
-				fecha = "vi";
-				break;
-			}
-			case 7: {
-				fecha = "sa";
-				break;
-			}
-		}
-		return new String[]{fecha, horaRet, fechaAhora, horaAhora};
 	}
 
 	@Override
@@ -209,9 +146,20 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 	public void verificarPatente(String patente) throws AutomovilNoEncontradoException, Exception {
 		logger.info(Mensajes.getMessage("ModeloInspectorImpl.verificarPatente.logger"),patente);
 		DAOAutomovil dao = new DAOAutomovilImpl(this.conexion);
-		dao.verificarPatente(patente); 
-	}	
-	
+		try {
+			dao.verificarPatente(patente);
+		} catch (AutomovilNoEncontradoException e) {
+			throw new AutomovilNoEncontradoException(e.getMessage());
+		}
+	}
+
+	/**
+	 * PREGUNTAR NO ENTIENDO ESTOY CANSADO
+	 * @param patente
+	 * @param ubicacion
+	 * @return
+	 * @throws Exception
+	 */
 	@Override
 	public EstacionamientoPatenteDTO recuperarEstacionamiento(String patente, UbicacionBean ubicacion) throws Exception {
 
@@ -224,37 +172,44 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 		 *      Importante: Para acceder a la B.D. utilice la propiedad this.conexion (de clase Connection) 
 		 *      que se hereda al extender la clase ModeloImpl.
 		 */
-		//
-		// Datos estáticos de prueba. Quitar y reemplazar por código que recupera los datos reale de la BD.
-		//
-		// Diseño de datos de prueba: Las patentes que terminan en 1 al 8 fueron verificados como existentes en la tabla automovil,
-		//                            las terminadas en 9 y 0 produjeron una excepción de AutomovilNoEncontradoException y Exception.
-		//                            entonces solo consideramos los casos terminados de 1 a 8
- 		// 
-		// Utilizaremos el criterio que si es par el último digito de patente entonces está registrado correctamente el estacionamiento.
-		//
-		String fechaEntrada, horaEntrada, estado;
-		
-		if (Integer.parseInt(patente.substring(patente.length()-1)) % 2 == 0) {
-			estado = EstacionamientoPatenteDTO.ESTADO_REGISTRADO;
+		String query = "SELECT C.patente, P.calle, P.altura, C.fecha_ent, C.hora_ent, C.fecha_sal, C.hora_sal FROM parquimetros.parquimetros P NATURAL JOIN (SELECT * FROM parquimetros.estacionamientos E NATURAL JOIN parquimetros.tarjetas T WHERE T.patente = ?) C;";
 
-			LocalDateTime currentDateTime = LocalDateTime.now();
-	        // Definir formatos para la fecha y la hora
-	        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-	        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+		String patenteAuto = "", calle, altura, fecha_ent = "", hora_ent = "", estado = EstacionamientoPatenteDTO.ESTADO_NO_REGISTRADO;
+		calle = ubicacion.getCalle();
+		altura = ubicacion.getAltura()+"";
 
-	        // Formatear la fecha y la hora como cadenas separadas
-	        fechaEntrada = currentDateTime.format(dateFormatter);
-	        horaEntrada = currentDateTime.format(timeFormatter);
-			
-		} else {
-			estado = EstacionamientoPatenteDTO.ESTADO_NO_REGISTRADO;
-	        fechaEntrada = "";
-	        horaEntrada = "";
+		try (PreparedStatement st = this.conexion.prepareStatement(query)) {
+			st.setString(1, patente);
+
+			try (ResultSet rs = st.executeQuery()) {
+				if (rs.next()) {
+					if(rs.getDate("fecha_sal") == null && rs.getTime("hora_sal") == null && Objects.equals(rs.getString("calle"), ubicacion.getCalle()) && rs.getInt("altura") == ubicacion.getAltura()) {
+						estado = EstacionamientoPatenteDTO.ESTADO_REGISTRADO;
+					}
+
+					SimpleDateFormat formatoFecha = new SimpleDateFormat("yyyy/MM/dd");
+					SimpleDateFormat formatoHora = new SimpleDateFormat("HH:mm:ss");
+
+					patenteAuto = rs.getString("patente");
+					fecha_ent = formatoFecha.format(rs.getDate("fecha_ent"));
+					hora_ent = formatoHora.format(rs.getTime("hora_ent"));
+				}
+			}
+		} catch (SQLException ex)
+		{
+			logger.error("SQLException: " + ex.getMessage());
+			logger.error("SQLState: " + ex.getSQLState());
+			logger.error("VendorError: " + ex.getErrorCode());
+			throw new Exception("Error inesperado al consultar la B.D.");
 		}
-
-		return new EstacionamientoPatenteDTOImpl(patente, ubicacion.getCalle(), String.valueOf(ubicacion.getAltura()), fechaEntrada, horaEntrada, estado);
-		// Fin de datos de prueba
+		//La patente no se encuentra registrada o no tiene una tarjeta asociada
+		//El controlador no permite agregar patentes no registradas, por lo tanto no es posible multar autos no registrados
+		if(Objects.equals(patenteAuto, "")){
+			String [] fechaHora = Fechas.getDiaTurnoFechaHora();
+			fecha_ent = fechaHora[2];
+			hora_ent = fechaHora[3];
+		}
+		return new EstacionamientoPatenteDTOImpl(patente, calle, altura, fecha_ent, hora_ent, estado);
 	}
 	
 
@@ -279,6 +234,12 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 		 *      Importante: Para acceder a la B.D. utilice la propiedad this.conexion (de clase Connection) 
 		 *      que se hereda al extender la clase ModeloImpl.      
 		 */
+
+		try {
+			checkInspectorHabilitado(ubicacion, inspectorLogueado);
+		} catch (ConexionParquimetroException e) {
+			throw new InspectorNoHabilitadoEnUbicacionException();
+		}
 		
 		//Datos estáticos de prueba. Quitar y reemplazar por código que recupera los datos reales.
 		//
@@ -314,5 +275,42 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 		}
 		// Fin datos prueba
 		return multas;		
+	}
+
+	/**
+	 * Consulta en la BD si el inspector recibido se encuentra habilitado para realizar una accion, es decir,
+	 * si se encuentra en una ubicacion valida y en un turno valido.
+	 * @param inspectorLogueado
+	 * @throws ConexionParquimetroException
+	 * @throws Exception
+	 */
+	private void checkInspectorHabilitado(UbicacionBean ubicacion, InspectorBean inspectorLogueado) throws ConexionParquimetroException, Exception {
+		logger.info(Mensajes.getMessage("ModeloInspectorImpl.checkInspectorHabilitado.logger"),inspectorLogueado.getLegajo(), ubicacion.getCalle(), ubicacion.getAltura());
+
+		String[] fechaHora = Fechas.getDiaTurnoFechaHora();
+		String queryCheck = "SELECT EXISTS (SELECT 1 FROM parquimetros.asociado_con A WHERE A.legajo = ? AND A.calle = ? AND A.altura = ? AND A.dia = ? AND A.turno = ?)";
+
+		try (PreparedStatement stCheck = this.conexion.prepareStatement(queryCheck)) {
+			stCheck.setInt(1, inspectorLogueado.getLegajo());
+			stCheck.setString(2, ubicacion.getCalle());
+			stCheck.setInt(3, ubicacion.getAltura());
+			//stCheck.setString(4, fechaHora[0]);
+			//stCheck.setString(5, fechaHora[1]);
+			//Usar inspector 1001 con contraseña c4rl05P@ss para pruebas
+			stCheck.setString(4, "lu");
+			stCheck.setString(5, "m");
+
+
+			try (ResultSet rs = stCheck.executeQuery()) {
+				if (rs.next() && !rs.getBoolean(1)) {
+					throw new ConexionParquimetroException("Error: inspector fuera de turno/horario/ubicacion.");
+				}
+			}
+		} catch (SQLException ex) {
+			logger.error("SQLException: " + ex.getMessage());
+			logger.error("SQLState: " + ex.getSQLState());
+			logger.error("VendorError: " + ex.getErrorCode());
+			throw new Exception("Error inesperado al consultar la B.D.");
+		}
 	}
 }
