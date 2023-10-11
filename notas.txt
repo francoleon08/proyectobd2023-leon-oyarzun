@@ -1,8 +1,10 @@
 MEDIDAS TOMASDAS PARA MEJORAR LA SEGURIADAD DE LAS CONSUTLAS SQL:
 
-    * Uso de sentecias preparadas (PreparedStatament) para evitar inyeccion SQL mediante
-    concatenacion de cadenas.
+    * Uso de sentecias preparadas (PreparedStatament) para evitar inyección SQL mediante
+    concatenación de cadenas.
 
     * Uso de try-with-resources para asegurarnos que los objetos como PreparedStatament
     y ResultSet se cierren a pesar de que algo falle. Estos se cierran automaticamente
     al finalizar el bloque try.
+
+    * Para optimizar la inserción de multas en la BD se utiliza batch para ejecutar una única vez.

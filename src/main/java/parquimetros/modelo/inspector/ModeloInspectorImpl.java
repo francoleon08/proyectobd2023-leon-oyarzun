@@ -2,8 +2,6 @@ package parquimetros.modelo.inspector;
 
 import java.sql.*;
 import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Objects;
 
@@ -31,8 +29,8 @@ import parquimetros.utils.Mensajes;
 
 public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 
-	private static Logger logger = LoggerFactory.getLogger(ModeloInspectorImpl.class);	
-	
+	private static Logger logger = LoggerFactory.getLogger(ModeloInspectorImpl.class);
+
 	public ModeloInspectorImpl() {
 		logger.debug(Mensajes.getMessage("ModeloInspectorImpl.constructor.logger"));
 	}
@@ -45,9 +43,9 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 			throw new InspectorNoAutenticadoException(Mensajes.getMessage("ModeloInspectorImpl.autenticar.parametrosVacios"));
 		}
 		DAOInspector dao = new DAOInspectorImpl(this.conexion);
-		return dao.autenticar(legajo, password);		
+		return dao.autenticar(legajo, password);
 	}
-	
+
 	@Override
 	public ArrayList<UbicacionBean> recuperarUbicaciones() throws Exception {
 		logger.info(Mensajes.getMessage("ModeloInspectorImpl.recuperarUbicaciones.logger"));
@@ -103,7 +101,7 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 			logger.error("VendorError: " + ex.getErrorCode());
 			throw new Exception("Error inesperado al consultar la B.D.");
 		}
-	
+
 		return parquimetros;
 	}
 
@@ -138,8 +136,8 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 		if (Objects.isNull(ubicacion)) {
 			DAOParquimetro dao = new DAOParquimetroImpl(this.conexion);
 			ubicacion = dao.recuperarUbicacion(parquimetro);
-		}			
-		return ubicacion; 
+		}
+		return ubicacion;
 	}
 
 	@Override
@@ -153,23 +151,16 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 		}
 	}
 
-	/**
-	 * PREGUNTAR NO ENTIENDO ESTOY CANSADO
-	 * @param patente
-	 * @param ubicacion
-	 * @return
-	 * @throws Exception
-	 */
 	@Override
 	public EstacionamientoPatenteDTO recuperarEstacionamiento(String patente, UbicacionBean ubicacion) throws Exception {
 
 		logger.info(Mensajes.getMessage("ModeloInspectorImpl.recuperarEstacionamiento.logger"),patente,ubicacion.getCalle(),ubicacion.getAltura());
 		/**
 		 * TODO Verifica si existe un estacionamiento abierto registrado la patente en la ubicación, y
-		 *	    de ser asi retorna un EstacionamientoPatenteDTO con estado Registrado (EstacionamientoPatenteDTO.ESTADO_REGISTRADO), 
+		 *	    de ser asi retorna un EstacionamientoPatenteDTO con estado Registrado (EstacionamientoPatenteDTO.ESTADO_REGISTRADO),
 		 * 		y caso contrario sale con estado No Registrado (EstacionamientoPatenteDTO.ESTADO_NO_REGISTRADO).
-		 * 
-		 *      Importante: Para acceder a la B.D. utilice la propiedad this.conexion (de clase Connection) 
+		 *
+		 *      Importante: Para acceder a la B.D. utilice la propiedad this.conexion (de clase Connection)
 		 *      que se hereda al extender la clase ModeloImpl.
 		 */
 		String query = "SELECT C.patente, P.calle, P.altura, C.fecha_ent, C.hora_ent, C.fecha_sal, C.hora_sal FROM parquimetros.parquimetros P NATURAL JOIN (SELECT * FROM parquimetros.estacionamientos E NATURAL JOIN parquimetros.tarjetas T WHERE T.patente = ?) C;";
@@ -211,70 +202,88 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
 		}
 		return new EstacionamientoPatenteDTOImpl(patente, calle, altura, fecha_ent, hora_ent, estado);
 	}
-	
+
 
 	@Override
-	public ArrayList<MultaPatenteDTO> generarMultas(ArrayList<String> listaPatentes, 
-													UbicacionBean ubicacion, 
-													InspectorBean inspectorLogueado) 
-									throws InspectorNoHabilitadoEnUbicacionException, Exception {
+	public ArrayList<MultaPatenteDTO> generarMultas(ArrayList<String> listaPatentes,
+													UbicacionBean ubicacion,
+													InspectorBean inspectorLogueado)
+			throws InspectorNoHabilitadoEnUbicacionException, Exception {
 
-		logger.info(Mensajes.getMessage("ModeloInspectorImpl.generarMultas.logger"),listaPatentes.size());		
-		
-		/** 
-		 * TODO Primero verificar si el inspector puede realizar una multa en esa ubicacion el dia y hora actual 
-		 *      segun la tabla asociado_con. Sino puede deberá producir una excepción de 
-		 *      InspectorNoHabilitadoEnUbicacionException. 
-		 *            
-		 * 		Luego para cada una de las patentes suministradas, si no tiene un estacionamiento abierto en dicha 
-		 *      ubicación, se deberá cargar una multa en la B.D. 
-		 *      
-		 *      Debe retornar una lista de las multas realizadas (lista de objetos MultaPatenteDTO).
-		 *      
-		 *      Importante: Para acceder a la B.D. utilice la propiedad this.conexion (de clase Connection) 
-		 *      que se hereda al extender la clase ModeloImpl.      
-		 */
+		logger.info(Mensajes.getMessage("ModeloInspectorImpl.generarMultas.logger"),listaPatentes.size());
 
 		try {
+			//Chequeo de inspector habilitado
 			checkInspectorHabilitado(ubicacion, inspectorLogueado);
 		} catch (ConexionParquimetroException e) {
 			throw new InspectorNoHabilitadoEnUbicacionException();
 		}
-		
-		//Datos estáticos de prueba. Quitar y reemplazar por código que recupera los datos reales.
-		//
-		// 1) throw InspectorNoHabilitadoEnUbicacionException
-		//
-		ArrayList<MultaPatenteDTO> multas = new ArrayList<MultaPatenteDTO>();
-		int nroMulta = 1;
-		
-		LocalDateTime currentDateTime = LocalDateTime.now();
-        // Definir formatos para la fecha y la hora
-        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
-        // Formatear la fecha y la hora como cadenas separadas
-        String fechaMulta = currentDateTime.format(dateFormatter);
-        String horaMulta = currentDateTime.format(timeFormatter);
-		
-		for (String patente : listaPatentes) {
-			
-			EstacionamientoPatenteDTO estacionamiento = this.recuperarEstacionamiento(patente,ubicacion);
-			if (estacionamiento.getEstado() == EstacionamientoPatenteDTO.ESTADO_NO_REGISTRADO) {
-				
-				MultaPatenteDTO multa = new MultaPatenteDTOImpl(String.valueOf(nroMulta), 
-																patente, 
-																ubicacion.getCalle(), 
-																String.valueOf(ubicacion.getAltura()), 
-																fechaMulta, 
-																horaMulta, 
-																String.valueOf(inspectorLogueado.getLegajo()));
-				multas.add(multa);
-				nroMulta++;
+		String query = "SELECT E.patente FROM parquimetros.estacionados E WHERE E.calle = ? AND E.altura = ?;";
+		String queryID = "SELECT A.id_asociado_con FROM parquimetros.asociado_con A WHERE A.legajo = ? AND A.calle = ? AND A.altura = ?;";
+		ArrayList<MultaPatenteDTO> multas = new ArrayList<MultaPatenteDTO>();
+		String[] fechaHora = Fechas.getDiaTurnoFechaHora();
+		int id_asociado = 0;
+
+		try (PreparedStatement psPatentes = this.conexion.prepareStatement(query);
+			 PreparedStatement psID = this.conexion.prepareStatement(queryID)) {
+			psPatentes.setString(1, ubicacion.getCalle());
+			psPatentes.setInt(2, ubicacion.getAltura());
+			psID.setInt(1, inspectorLogueado.getLegajo());
+			psID.setString(2, ubicacion.getCalle());
+			psID.setInt(3, ubicacion.getAltura());
+
+			try (ResultSet rsPatentes = psPatentes.executeQuery();
+				 ResultSet rsID = psID.executeQuery()) {
+				//Elimino las patentes con un estacionamiento abierto
+				while (rsPatentes.next()) {
+					listaPatentes.remove(rsPatentes.getString("patente"));
+				}
+
+				//Obtengo el id_asociado_con del inspector
+				if(rsID.next()) {
+					id_asociado = rsID.getInt("id_asociado_con");
+				}
+
+				//Se crean las multas correspondientes
+				int nroMulta = 1;
+				for (String p: listaPatentes) {
+					MultaPatenteDTO multa = new MultaPatenteDTOImpl(
+							Integer.toString(nroMulta++),
+							p,
+							ubicacion.getCalle(),
+							Integer.toString(ubicacion.getAltura()),
+							fechaHora[2],
+							fechaHora[3],
+							Integer.toString(inspectorLogueado.getLegajo())
+					);
+
+					multas.add(multa);
+				}
 			}
+
+			String queryMultas = "INSERT INTO parquimetros.multa (patente, id_asociado_con, fecha, hora) VALUES (?,?,?,?) ";
+
+			//Utilizando lotes, se insertan las multas en la base de datos
+			try (PreparedStatement psMultas = this.conexion.prepareStatement(queryMultas)) {
+				for (MultaPatenteDTO m : multas) {
+					psMultas.setString(1, m.getPatente());
+					psMultas.setInt(2,id_asociado);
+					psMultas.setString(3, fechaHora[2]);
+					psMultas.setString(4, fechaHora[3]);
+
+					psMultas.addBatch();
+				}
+
+				psMultas.executeBatch();
+			}
+		} catch (SQLException ex) {
+			logger.error("SQLException: " + ex.getMessage());
+			logger.error("SQLState: " + ex.getSQLState());
+			logger.error("VendorError: " + ex.getErrorCode());
+			throw new Exception("Error inesperado al consultar la B.D.");
 		}
-		// Fin datos prueba
-		return multas;		
+		return multas;
 	}
 
 	/**
