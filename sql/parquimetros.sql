@@ -177,16 +177,6 @@ NATURAL JOIN
 CREATE USER 'admin'@'localhost'  IDENTIFIED BY 'admin';
 GRANT ALL PRIVILEGES ON parquimetros.* TO 'admin'@'localhost' WITH GRANT OPTION;
 
-/* User Parquimetro 
-    Para poder invocar el store procedure, incorpore un nuevo usuario al servidor MySQL llamado
-    parqu´ımetro. Este usuario est´a destinado a permitir el acceso de los parqu´ımetros a la base de datos,
-    para abrir y cerrar estacionamientos y solo deber´a tener privilegios para ejecutar el s.p.conectar El
-    password de este usuario deber´a ser parq y la sentencia de creaci´on de este usuario deber´a a˜nadirse al
-    archivo “parquimetros.sql”.
-*/
-CREATE USER 'parquimetro'@'%'  IDENTIFIED BY 'parq';
-GRANT ALL PRIVILEGES ON parquimetros.* TO 'parquimetro'@'%' WITH GRANT OPTION;
-
 /* User venta */
 CREATE USER 'venta'@'%'  IDENTIFIED BY 'venta';
 GRANT SELECT, UPDATE, INSERT ON parquimetros.tarjetas TO 'venta'@'%';

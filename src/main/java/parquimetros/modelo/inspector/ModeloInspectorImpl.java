@@ -1,7 +1,6 @@
 package parquimetros.modelo.inspector;
 
 import java.sql.*;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Objects;
 
@@ -275,17 +274,18 @@ public class ModeloInspectorImpl extends ModeloImpl implements ModeloInspector {
         logger.info(Mensajes.getMessage("ModeloInspectorImpl.checkInspectorHabilitado.logger"),inspectorLogueado.getLegajo(), ubicacion.getCalle(), ubicacion.getAltura());
 
         String[] fechaHora = Fechas.getDiaTurnoFechaHora();
+        /*
+        En el caso de que el inspector este habilitado retorna una tabla con una unica tupla
+        que contiene un 1, caso contrario devuelve una tabla vacia.
+         */
         String queryCheck = "SELECT EXISTS (SELECT 1 FROM parquimetros.asociado_con A WHERE A.legajo = ? AND A.calle = ? AND A.altura = ? AND A.dia = ? AND A.turno = ?)";
 
         try (PreparedStatement stCheck = this.conexion.prepareStatement(queryCheck)) {
             stCheck.setInt(1, inspectorLogueado.getLegajo());
             stCheck.setString(2, ubicacion.getCalle());
             stCheck.setInt(3, ubicacion.getAltura());
-            //stCheck.setString(4, fechaHora[0]);
-            //stCheck.setString(5, fechaHora[1]);
-            //Usar inspector 1001 con contraseña c4rl05P@ss para pruebas
-            stCheck.setString(4, "lu");
-            stCheck.setString(5, "m");
+            stCheck.setString(4, fechaHora[0]);
+            stCheck.setString(5, fechaHora[1]);
 
 
             try (ResultSet rs = stCheck.executeQuery()) {
