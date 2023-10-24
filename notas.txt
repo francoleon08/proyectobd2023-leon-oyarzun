@@ -1,10 +1,20 @@
 MEDIDAS TOMASDAS PARA MEJORAR LA SEGURIADAD DE LAS CONSUTLAS SQL:
 
-    * Uso de sentecias preparadas (PreparedStatament) para evitar inyección SQL mediante
-    concatenación de cadenas.
+    * Uso de sentecias preparadas (PreparedStatament) para evitar inyección SQL mediante concatenación de cadenas.
 
-    * Uso de try-with-resources para asegurarnos que los objetos como PreparedStatament
-    y ResultSet se cierren a pesar de que algo falle. Estos se cierran automaticamente
-    al finalizar el bloque try.
+    * Uso de try-with-resources para asegurarnos que los objetos como PreparedStatament y ResultSet se cierren a
+    pesar de que algo falle. Estos se cierran automaticamente al finalizar el bloque try (por esta razon no se cierra
+    nigun PreparedStatement ni ResultSet porque es codigo redundante).
 
     * Para optimizar la inserción de multas en la BD se utiliza batch para ejecutar una única vez.
+
+    * En el metodo veririfarPatente() se corrobora que la patente recibida como parametro se encuentre en la base
+    de datos. Esto conlleva a un error en el controlador donde al momento de cargar una patente en la unidad personal
+    del inspector, si la misma no se encuentra en la BD no sera posible realizar una multa.
+
+    * Al momento de pegar con CTRL+V la contraseña de un inspector en la casilla correspondiente al password puede
+    ocurrir una Exception que la vista no controla.
+    Aclaramos esto para no generar confusiones con el modelo implementado, ya que no es parte del mismo.
+
+    * Se utiliza la libreria "lombok" para generar Setters y Getters implicitos en los beans, obteniendo asi un codigo
+    más limpio.
