@@ -171,11 +171,29 @@ NATURAL JOIN
     WHERE E.fecha_sal IS NULL AND E.hora_sal IS NULL
 ) Es;
 
+/* TRIGGER */
+
+delimiter !
+CREATE TRIGGER crate_recargas
+AFTER UPDATE ON tarjetas
+FOR EACH ROW
+BEGIN
+    IF NEW.saldo > OLD.saldo THEN
+        INSERT INTO recargas VALUES (NEW.id_tarjeta, CURDATE(), CURTIME(), OLD.saldo, NEW.saldo);
+    END IF;
+END; !
+
+delimiter ;
+
 /* USUARIOS */
 
 /* User admin */
 CREATE USER 'admin'@'localhost'  IDENTIFIED BY 'admin';
 GRANT ALL PRIVILEGES ON parquimetros.* TO 'admin'@'localhost' WITH GRANT OPTION;
+
+/* User parquiemtro */
+CREATE USER 'parquimetro'@'%'  IDENTIFIED BY 'parq';
+GRANT ALL PRIVILEGES ON parquimetros.* TO 'parquimetro'@'%' WITH GRANT OPTION;
 
 /* User venta */
 CREATE USER 'venta'@'%'  IDENTIFIED BY 'venta';
