@@ -31,8 +31,6 @@ public class ControladorParquimetroImpl implements ControladorParquimetro {
 		logger.debug(Mensajes.getMessage("ControladorParquimetroImpl.constructor.logger"));
 		this.ventana = ventana;
 		this.modelo = modelo;
-		//CONSULTAR
-		this.modelo.conectar("parquimetro", "parq");
 		this.ventana.registrarControlador(this);
 	}
 
