@@ -230,24 +230,29 @@ BEGIN
                 /* Si tiene saldo disponible */
                 IF saldo > 0 THEN                     
                     SET tiempo = saldo / (tarifa * (1 - descuento));
+                    SET fecha_apertura = CURDATE();
+                    SET hora_apertura = CURTIME();
                 
                     INSERT INTO estacionamientos (id_parq, fecha_ent, hora_ent, id_tarjeta) 
-                    VALUES (id_parq, CURDATE(), CURTIME(), id_tarjeta);
+                    VALUES (id_parq, fecha_apertura, hora_apertura, id_tarjeta);
                                     
-                    SELECT 'apertura' as operacion, 'Apertura exitosa' as mensaje, tiempo as tiempo_disponible;
+                    SELECT 'apertura' as operacion, 'Apertura exitosa' as mensaje, tiempo as tiempo_disponible, fecha_apertura, hora_apertura;
                 ELSE
                     SELECT 'apertura' as operacion, 'Apertura fallida, saldo insuficiente' as mensaje;
                 END IF;
         /* Si no tiene un estacionamiento abierto */
 		ELSE
-			SELECT e.fecha_ent INTO fecha_apertura FROM estacionamientos e WHERE e.id_parq = id_parq AND e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
-            SELECT e.hora_ent INTO hora_apertura FROM estacionamientos e WHERE e.id_parq = id_parq AND e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
+			SELECT e.fecha_ent INTO fecha_apertura FROM estacionamientos e WHERE e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
+            SELECT e.hora_ent INTO hora_apertura FROM estacionamientos e WHERE e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
 			SET tiempo_transcurrido = CAST(TIMESTAMPDIFF(MINUTE, CONCAT(fecha_apertura, ' ', hora_apertura), NOW()) AS DECIMAL(5,2));
+            SET fecha_sal = CURDATE();
+            SET hora_sal = CURTIME();
             /* Cierre de estacionamiento */
-            UPDATE estacionamientos E SET E.fecha_sal = CURDATE(), E.hora_sal = CURTIME() WHERE E.id_tarjeta = id_tarjeta AND E.id_parq = id_parq AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
+            UPDATE estacionamientos E SET E.fecha_sal = fecha_sal, E.hora_sal = hora_sal WHERE E.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
             /* Actualizacion de saldo */
             UPDATE tarjetas t SET t.saldo = CAST(saldo - (tiempo_transcurrido * tarifa * (1 - descuento)) AS DECIMAL(5,2)) WHERE t.id_tarjeta = id_tarjeta;            
-			SELECT 'cierre' as operacion, 'Cierre exitoso' as mensaje;
+            SELECT t.saldo INTO saldo FROM tarjetas t WHERE t.id_tarjeta = id_tarjeta;
+			SELECT 'cierre' as operacion, tiempo_transcurrido, saldo, fecha_apertura, hora_apertura, fecha_sal, hora_sal;
         END IF;        
     END IF;
     

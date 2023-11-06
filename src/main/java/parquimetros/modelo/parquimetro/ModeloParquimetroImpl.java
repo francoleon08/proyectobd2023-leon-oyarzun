@@ -2,6 +2,7 @@ package parquimetros.modelo.parquimetro;
 
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -9,13 +10,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import parquimetros.modelo.ModeloImpl;
 import parquimetros.modelo.beans.*;
+import parquimetros.modelo.parquimetro.dto.EntradaEstacionamientoDTOImpl;
 import parquimetros.modelo.parquimetro.dto.EstacionamientoDTO;
+import parquimetros.modelo.parquimetro.dto.SalidaEstacionamientoDTOImpl;
 import parquimetros.modelo.parquimetro.exception.ParquimetroNoExisteException;
 import parquimetros.modelo.parquimetro.exception.SinSaldoSuficienteException;
 import parquimetros.modelo.parquimetro.exception.TarjetaNoExisteException;
 import parquimetros.utils.Mensajes;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Objects;
 
 public class ModeloParquimetroImpl extends ModeloImpl implements ModeloParquimetro {
 
@@ -142,6 +146,58 @@ public class ModeloParquimetroImpl extends ModeloImpl implements ModeloParquimet
 			throws SinSaldoSuficienteException, ParquimetroNoExisteException, TarjetaNoExisteException, Exception {
 		logger.info(Mensajes.getMessage("ModeloParquimetroImpl.conectarParquimetro.logger"),parquimetro.getId(),tarjeta.getId());
 
+		String query ="call conectar(?,?)";
+
+		try (PreparedStatement st = this.conexion.prepareStatement(query)) {
+			st.setInt(1, tarjeta.getId());
+			st.setInt(2, parquimetro.getId());
+
+			try (ResultSet rs = st.executeQuery()) {
+				if(rs.next()) {
+					String result = rs.getString("operacion");
+					if(Objects.equals(result, "error")) {
+						throw new Exception(rs.getString("operacion"));
+					}
+					if(Objects.equals(result, "apertura")) {
+						if(Objects.equals(rs.getString("mensaje"), "Apertura exitosa")) {
+							return aperturaEstacionamiento(rs);
+						} else {
+							throw new Exception(rs.getString("mensaje"));
+						}
+					} else {
+						return cierreEstacionamiento(rs);
+					}
+				}
+			}
+		}
+		catch (SQLException ex) {
+			logger.error("SQLException: " + ex.getMessage());
+			logger.error("SQLState: " + ex.getSQLState());
+			logger.error("VendorError: " + ex.getErrorCode());
+			throw new Exception(ex.getMessage());
+		}
+
 		return null;
+	}
+
+	private EstacionamientoDTO aperturaEstacionamiento(ResultSet rs) throws SQLException {
+		SimpleDateFormat formato_fecha = new SimpleDateFormat("yyyy-MM-dd");
+		SimpleDateFormat formato_hora = new SimpleDateFormat("HH:mm:ss");
+		return new EntradaEstacionamientoDTOImpl(
+				Integer.toString(rs.getInt("tiempo_disponible")),
+				formato_fecha.format(rs.getDate("fecha_apertura")),
+				formato_hora.format(rs.getTime("hora_apertura")));
+	}
+
+	private EstacionamientoDTO cierreEstacionamiento(ResultSet rs) throws SQLException {
+		SimpleDateFormat formato_fecha = new SimpleDateFormat("yyyy-MM-dd");
+		SimpleDateFormat formato_hora = new SimpleDateFormat("HH:mm:ss");
+		return new SalidaEstacionamientoDTOImpl(
+				Integer.toString(rs.getInt("tiempo_transcurrido")),
+				Float.toString(rs.getFloat("saldo")),
+				formato_fecha.format(rs.getDate("fecha_apertura")),
+				formato_hora.format(rs.getTime("hora_apertura")),
+				formato_fecha.format(rs.getDate("fecha_sal")),
+				formato_hora.format(rs.getTime("hora_sal")));
 	}
 }
