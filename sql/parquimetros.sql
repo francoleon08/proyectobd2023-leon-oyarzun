@@ -192,8 +192,8 @@ delimiter !
 CREATE PROCEDURE `conectar`(IN id_tarjeta INTEGER , IN id_parq INTEGER)
     
 BEGIN
-	DECLARE operacion VARCHAR(10);
-    DECLARE tiempo DECIMAL(5,2);
+    DECLARE tiempo INTEGER;
+    DECLARE tiempo_transcurrido DECIMAL(5,2);
     DECLARE saldo DECIMAL(5,2);
     DECLARE fecha_apertura DATE;
     DECLARE hora_apertura TIME;
@@ -201,42 +201,57 @@ BEGIN
     DECLARE hora_sal TIME;
     DECLARE descuento DECIMAL(3,2);
 	DECLARE tarifa DECIMAL(5,2);
-    
+    DECLARE errno INT;
+	DECLARE estado CHAR(5);
+	DECLARE mensaje TEXT;
+	DECLARE throw TEXT;
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+		BEGIN
+			GET DIAGNOSTICS CONDITION 1
+			errno = MYSQL_ERRNO, estado = RETURNED_SQLSTATE, mensaje = MESSAGE_TEXT;
+			SET throw = CONCAT('Falla : SQLEXCEPTION!, transaccion abortada. Error = ', estado, ', Mensaje = ', mensaje); 
+			SELECT throw, errno;
+			ROLLBACK;
+		END;
     
     START TRANSACTION;
     
-    SELECT t.saldo INTO saldo FROM tarjetas t WHERE t.id_tarjeta = id_tarjeta;
-    SELECT tipo_tarj.descuento INTO descuento FROM tarjetas t, tipos_tarjeta tipo_tarj WHERE t.id_tarjeta = id_tarjeta AND t.tipo = tipo_tarj.tipo;
-    
     IF NOT EXISTS (SELECT * FROM tarjetas t WHERE t.id_tarjeta = id_tarjeta) OR
        NOT EXISTS (SELECT * FROM parquimetros p WHERE p.id_parq = id_parq) THEN
-        ROLLBACK;
         SELECT 'error' as operacion, 'Tarjeta o parquímetro no existen' as mensaje;
     ELSE
-        IF saldo > 0 THEN
-			IF NOT EXISTS (SELECT * FROM estacionamientos e WHERE e.id_parq = id_parq AND e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL) THEN
+        SELECT t.saldo INTO saldo FROM tarjetas t WHERE t.id_tarjeta = id_tarjeta;
+        SELECT tipo_tarj.descuento INTO descuento FROM tarjetas t, tipos_tarjeta tipo_tarj WHERE t.id_tarjeta = id_tarjeta AND t.tipo = tipo_tarj.tipo;
+        SELECT U.tarifa INTO tarifa FROM ubicaciones U NATURAL JOIN parquimetros P WHERE P.id_parq = id_parq;
+
+        /* Si no tiene un estacionamiento abierto */
+        IF NOT EXISTS (SELECT * FROM estacionamientos e WHERE e.id_parq = id_parq AND e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL) THEN
+                /* Si tiene saldo disponible */
+                IF saldo > 0 THEN                     
+                    SET tiempo = saldo / (tarifa * (1 - descuento));
                 
-				SELECT u.tarifa INTO tarifa FROM ubicaciones u WHERE u.calle = (SELECT p.calle FROM parquimetros p WHERE p.id_parq = id_parq) AND u.altura = (SELECT p.altura FROM parquimetros p WHERE p.id_parq = id_parq);
-				SET tiempo = saldo / (tarifa * (1 - descuento));
-            
-				INSERT INTO estacionamientos (id_parq, fecha_ent, hora_ent, id_tarjeta) 
-				VALUES (id_parq, CURDATE(), CURTIME(), id_tarjeta);
-				SET fecha_apertura = NOW();
-            
-				COMMIT;
-				SELECT 'apertura' as operacion, 'Apertura exitosa' as mensaje, tiempo as tiempo_disponible;
-			ELSE
-				SELECT e.fecha_ent INTO fecha_apertura FROM estacionamientos e WHERE e.id_parq = id_parq AND e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
-                SELECT e.hora_ent INTO hora_apertura FROM estacionamientos e WHERE e.id_parq = id_parq AND e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
-				SET tiempo = TIMESTAMPDIFF(MINUTE, CONCAT(fecha_apertura, ' ', hora_apertura), NOW());
-				SELECT 'cierre' as operacion, 'Cierre exitoso' as mensaje;
-            END IF;
-        ELSE
-            ROLLBACK;
-            SELECT 'error' as operacion, 'Saldo insuficiente en la tarjeta' as mensaje;
-        END IF;
+                    INSERT INTO estacionamientos (id_parq, fecha_ent, hora_ent, id_tarjeta) 
+                    VALUES (id_parq, CURDATE(), CURTIME(), id_tarjeta);
+                                    
+                    SELECT 'apertura' as operacion, 'Apertura exitosa' as mensaje, tiempo as tiempo_disponible;
+                ELSE
+                    SELECT 'apertura' as operacion, 'Apertura fallida, saldo insuficiente' as mensaje;
+                END IF;
+        /* Si no tiene un estacionamiento abierto */
+		ELSE
+			SELECT e.fecha_ent INTO fecha_apertura FROM estacionamientos e WHERE e.id_parq = id_parq AND e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
+            SELECT e.hora_ent INTO hora_apertura FROM estacionamientos e WHERE e.id_parq = id_parq AND e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
+			SET tiempo_transcurrido = CAST(TIMESTAMPDIFF(MINUTE, CONCAT(fecha_apertura, ' ', hora_apertura), NOW()) AS DECIMAL(5,2));
+            /* Cierre de estacionamiento */
+            UPDATE estacionamientos E SET E.fecha_sal = CURDATE(), E.hora_sal = CURTIME() WHERE E.id_tarjeta = id_tarjeta AND E.id_parq = id_parq AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
+            /* Actualizacion de saldo */
+            UPDATE tarjetas t SET t.saldo = CAST(saldo - (tiempo_transcurrido * tarifa * (1 - descuento)) AS DECIMAL(5,2)) WHERE t.id_tarjeta = id_tarjeta;            
+			SELECT 'cierre' as operacion, 'Cierre exitoso' as mensaje;
+        END IF;        
     END IF;
     
+    COMMIT;
 END; !
 delimiter ;
 
