@@ -156,13 +156,17 @@ public class ModeloParquimetroImpl extends ModeloImpl implements ModeloParquimet
 				if(rs.next()) {
 					String result = rs.getString("operacion");
 					if(Objects.equals(result, "error")) {
-						throw new Exception(rs.getString("operacion"));
+						if(Objects.equals(result, "tarjeta")) {
+							throw new TarjetaNoExisteException();
+						} else {
+							throw new ParquimetroNoExisteException();
+						}
 					}
 					if(Objects.equals(result, "apertura")) {
 						if(Objects.equals(rs.getString("mensaje"), "Apertura exitosa")) {
 							return aperturaEstacionamiento(rs);
 						} else {
-							throw new Exception(rs.getString("mensaje"));
+							throw new SinSaldoSuficienteException();
 						}
 					} else {
 						return cierreEstacionamiento(rs);

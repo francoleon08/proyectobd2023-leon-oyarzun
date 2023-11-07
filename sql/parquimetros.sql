@@ -216,17 +216,18 @@ BEGIN
 		END;
     
     START TRANSACTION;
-    
-    IF NOT EXISTS (SELECT * FROM tarjetas t WHERE t.id_tarjeta = id_tarjeta) OR
-       NOT EXISTS (SELECT * FROM parquimetros p WHERE p.id_parq = id_parq) THEN
-        SELECT 'error' as operacion, 'Tarjeta o parquímetro no existen' as mensaje;
-    ELSE
-        SELECT t.saldo INTO saldo FROM tarjetas t WHERE t.id_tarjeta = id_tarjeta;
-        SELECT tipo_tarj.descuento INTO descuento FROM tarjetas t, tipos_tarjeta tipo_tarj WHERE t.id_tarjeta = id_tarjeta AND t.tipo = tipo_tarj.tipo;
+
+    /* Si existen en la BD la tarjeta y el parquimetro */    
+    IF EXISTS (SELECT * FROM tarjetas T WHERE T.id_tarjeta = id_tarjeta) AND EXISTS (SELECT * FROM parquimetros P WHERE P.id_parq = id_parq) THEN
+        SELECT T.saldo INTO saldo FROM tarjetas T WHERE T.id_tarjeta = id_tarjeta;
+        SELECT TT.descuento INTO descuento FROM tarjetas T, tipos_tarjeta TT WHERE T.id_tarjeta = id_tarjeta AND T.tipo = TT.tipo;
         SELECT U.tarifa INTO tarifa FROM ubicaciones U NATURAL JOIN parquimetros P WHERE P.id_parq = id_parq;
 
         /* Si no tiene un estacionamiento abierto */
-        IF NOT EXISTS (SELECT * FROM estacionamientos e WHERE e.id_parq = id_parq AND e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL) THEN
+        IF NOT EXISTS (SELECT 1 FROM estacionamientos E 
+            WHERE E.id_tarjeta = id_tarjeta AND E.fecha_ent IS NOT NULL AND 
+            E.hora_ent IS NOT NULL AND E.fecha_sal IS NULL AND E.hora_sal IS NULL) 
+            THEN
                 /* Si tiene saldo disponible */
                 IF saldo > 0 THEN                     
                     SET tiempo = saldo / (tarifa * (1 - descuento));
@@ -236,24 +237,30 @@ BEGIN
                     INSERT INTO estacionamientos (id_parq, fecha_ent, hora_ent, id_tarjeta) 
                     VALUES (id_parq, fecha_apertura, hora_apertura, id_tarjeta);
                                     
-                    SELECT 'apertura' as operacion, 'Apertura exitosa' as mensaje, tiempo as tiempo_disponible, fecha_apertura, hora_apertura;
+                    SELECT 'apertura' AS operacion, 'Apertura exitosa' AS mensaje, tiempo AS tiempo_disponible, fecha_apertura, hora_apertura;
                 ELSE
-                    SELECT 'apertura' as operacion, 'Apertura fallida, saldo insuficiente' as mensaje;
+                    SELECT 'apertura' AS operacion, 'Apertura fallida, saldo insuficiente' AS mensaje;
                 END IF;
-        /* Si no tiene un estacionamiento abierto */
+        /* Si tiene un estacionamiento abierto */
 		ELSE
-			SELECT e.fecha_ent INTO fecha_apertura FROM estacionamientos e WHERE e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
-            SELECT e.hora_ent INTO hora_apertura FROM estacionamientos e WHERE e.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
+			SELECT E.fecha_ent INTO fecha_apertura FROM estacionamientos E WHERE E.id_tarjeta = id_tarjeta AND E.fecha_sal IS NULL AND E.hora_sal IS NULL;
+            SELECT E.hora_ent INTO hora_apertura FROM estacionamientos E WHERE E.id_tarjeta = id_tarjeta AND E.fecha_sal IS NULL AND E.hora_sal IS NULL;
 			SET tiempo_transcurrido = CAST(TIMESTAMPDIFF(MINUTE, CONCAT(fecha_apertura, ' ', hora_apertura), NOW()) AS DECIMAL(5,2));
             SET fecha_sal = CURDATE();
             SET hora_sal = CURTIME();
             /* Cierre de estacionamiento */
             UPDATE estacionamientos E SET E.fecha_sal = fecha_sal, E.hora_sal = hora_sal WHERE E.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
             /* Actualizacion de saldo */
-            UPDATE tarjetas t SET t.saldo = CAST(saldo - (tiempo_transcurrido * tarifa * (1 - descuento)) AS DECIMAL(5,2)) WHERE t.id_tarjeta = id_tarjeta;            
-            SELECT t.saldo INTO saldo FROM tarjetas t WHERE t.id_tarjeta = id_tarjeta;
-			SELECT 'cierre' as operacion, tiempo_transcurrido, saldo, fecha_apertura, hora_apertura, fecha_sal, hora_sal;
-        END IF;        
+            UPDATE tarjetas T SET T.saldo = CAST(saldo - (tiempo_transcurrido * tarifa * (1 - descuento)) AS DECIMAL(5,2)) WHERE T.id_tarjeta = id_tarjeta;
+            SELECT T.saldo INTO saldo FROM tarjetas T WHERE T.id_tarjeta = id_tarjeta;
+			SELECT 'cierre' AS operacion, tiempo_transcurrido, saldo, fecha_apertura, hora_apertura, fecha_sal, hora_sal;
+        END IF;   
+    ELSE
+        IF NOT EXISTS (SELECT * FROM tarjetas T WHERE T.id_tarjeta = id_tarjeta) THEN
+            SELECT 'error' as operacion, 'tarjeta' as mensaje;
+        ELSE
+            SELECT 'error' as operacion, 'parquimetro' as mensaje;
+        END IF;
     END IF;
     
     COMMIT;
@@ -268,7 +275,14 @@ GRANT ALL PRIVILEGES ON parquimetros.* TO 'admin'@'localhost' WITH GRANT OPTION;
 
 /* User parquiemtro */
 CREATE USER 'parquimetro'@'%'  IDENTIFIED BY 'parq';
-GRANT ALL PRIVILEGES ON parquimetros.* TO 'parquimetro'@'%' WITH GRANT OPTION;
+/* GRANT ALL PRIVILEGES ON parquimetros.* TO 'parquimetro'@'%' WITH GRANT OPTION; */
+GRANT EXECUTE ON PROCEDURE parquimetros.conectar to 'parquimetro'@'%';
+GRANT SELECT ON parquimetros.tipos_tarjeta TO 'parquimetro'@'%';
+GRANT SELECT ON parquimetros.tarjetas TO 'parquimetro'@'%';
+GRANT SELECT ON parquimetros.automoviles TO 'parquimetro'@'%';
+GRANT SELECT ON parquimetros.conductores TO 'parquimetro'@'%';
+GRANT SELECT ON parquimetros.ubicaciones TO 'parquimetro'@'%';
+GRANT SELECT ON parquimetros.parquimetros TO 'parquimetro'@'%';
 
 /* User venta */
 CREATE USER 'venta'@'%'  IDENTIFIED BY 'venta';
