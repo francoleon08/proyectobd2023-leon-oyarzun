@@ -267,6 +267,40 @@ BEGIN
 END; !
 delimiter ;
 
+/* EVENT */
+/* 
+    Se ejecuta todos los dias a las 20hs, su funcion es cerrar los estacionamientos abiertos cuando el
+    parquimetro deja de operar. De esta forma se cumple con la franja horaria de 8hs a 20hs.
+    Se implemento para evitar saldos muy grandes, los cuales podrian superar los 3 digitos enteros y causar 
+    un error en la base de datos, ya que el saldo de una tarjeta se define como decimal(5,2) y depende
+    del tiempo transcurrido.
+
+    Para que este funcione se debe ejcutar la siguiente instrucción: SET GLOBAL event_scheduler=ON;
+ */
+
+delimiter !
+
+CREATE EVENT salida_automatica
+ON SCHEDULE EVERY 1 DAY
+STARTS CONCAT(CURDATE(),' ', '20:00:00') DO
+BEGIN
+    DECLARE id_parq INTEGER;
+    DECLARE id_tarjeta INTEGER;
+    DECLARE fin BOOLEAN DEFAULT false;
+    DECLARE C CURSOR FOR SELECT E.id_tarjeta, E.id_parq FROM estacionamientos E 
+        WHERE E.fecha_ent IS NOT NULL AND E.hora_ent IS NOT NULL AND E.fecha_sal IS NULL AND E.hora_sal IS NULL;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET fin = true;
+    OPEN C;
+    FETCH C INTO id_tarjeta, id_parq;
+    WHILE NOT fin DO
+        CALL conectar(id_tarjeta, id_parq);
+        FETCH C INTO id_tarjeta, id_parq;
+    END WHILE;
+    CLOSE C;
+END; !
+
+delimiter ;
+
 /* USUARIOS */
 
 /* User admin */
@@ -275,7 +309,6 @@ GRANT ALL PRIVILEGES ON parquimetros.* TO 'admin'@'localhost' WITH GRANT OPTION;
 
 /* User parquiemtro */
 CREATE USER 'parquimetro'@'%'  IDENTIFIED BY 'parq';
-/* GRANT ALL PRIVILEGES ON parquimetros.* TO 'parquimetro'@'%' WITH GRANT OPTION; */
 GRANT EXECUTE ON PROCEDURE parquimetros.conectar to 'parquimetro'@'%';
 GRANT SELECT ON parquimetros.tipos_tarjeta TO 'parquimetro'@'%';
 GRANT SELECT ON parquimetros.tarjetas TO 'parquimetro'@'%';
