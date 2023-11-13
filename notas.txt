@@ -18,3 +18,24 @@ MEDIDAS TOMASDAS PARA MEJORAR LA SEGURIADAD DE LAS CONSUTLAS SQL:
 
     * Se utiliza la libreria "lombok" para generar Setters y Getters implicitos en los beans, obteniendo asi un codigo
     más limpio.
+
+##################### PARTE 2 #####################
+
+Problemas con el procedimiento almacenado 'conectar()':
+
+**Limitación de Saldo:**
+
+    * Debido a decisiones de diseño externas a nuestra implementación, nos enfrentamos a una restricción en la capacidad 
+    de cobrar un estacionamiento, donde el nuevo saldo debe ser mayor a -1000. Esta limitación está influenciada por diversos 
+    factores, como el tiempo transcurrido y las tarifas aplicadas. En consecuencia, hemos optado por sacrificar información de 
+    saldo para garantizar el correcto funcionamiento de la aplicación.
+
+**Evento Diario de Cierre de Estacionamientos:**
+
+    * Como resultado de la decisión anterior, hemos implementado un evento que se ejecuta diariamente a las 20:00 horas para 
+    cerrar todos los estacionamientos abiertos. Esta acción simula una franja horaria y reduce las posibilidades de que el saldo 
+    caiga fuera del rango especificado. Es importante destacar que esta medida no resuelve el problema, sino que lo minimiza.
+
+**Límites Establecidos:**
+	* Límite de Saldo: (-999.99, 999.99).
+	* Límite de Tiempo: 99999.99.

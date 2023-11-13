@@ -193,8 +193,9 @@ CREATE PROCEDURE `conectar`(IN id_tarjeta INTEGER , IN id_parq INTEGER)
     
 BEGIN
     DECLARE tiempo INTEGER;
-    DECLARE tiempo_transcurrido DECIMAL(5,2);
+    DECLARE tiempo_transcurrido DECIMAL(7,2);
     DECLARE saldo DECIMAL(5,2);
+    DECLARE nuevo_saldo DECIMAL(8,2);
     DECLARE fecha_apertura DATE;
     DECLARE hora_apertura TIME;
     DECLARE fecha_sal DATE;
@@ -245,15 +246,21 @@ BEGIN
 		ELSE
 			SELECT E.fecha_ent INTO fecha_apertura FROM estacionamientos E WHERE E.id_tarjeta = id_tarjeta AND E.fecha_sal IS NULL AND E.hora_sal IS NULL;
             SELECT E.hora_ent INTO hora_apertura FROM estacionamientos E WHERE E.id_tarjeta = id_tarjeta AND E.fecha_sal IS NULL AND E.hora_sal IS NULL;
-			SET tiempo_transcurrido = CAST(TIMESTAMPDIFF(MINUTE, CONCAT(fecha_apertura, ' ', hora_apertura), NOW()) AS DECIMAL(5,2));
+			SET tiempo_transcurrido = TIMESTAMPDIFF(MINUTE, CONCAT(fecha_apertura, ' ', hora_apertura), NOW());
             SET fecha_sal = CURDATE();
             SET hora_sal = CURTIME();
+            SET nuevo_saldo = saldo - (tiempo_transcurrido * tarifa * (1 - descuento));
             /* Cierre de estacionamiento */
             UPDATE estacionamientos E SET E.fecha_sal = fecha_sal, E.hora_sal = hora_sal WHERE E.id_tarjeta = id_tarjeta AND e.fecha_sal IS NULL AND e.hora_sal IS NULL;
-            /* Actualizacion de saldo */
-            UPDATE tarjetas T SET T.saldo = CAST(saldo - (tiempo_transcurrido * tarifa * (1 - descuento)) AS DECIMAL(5,2)) WHERE T.id_tarjeta = id_tarjeta;
-            SELECT T.saldo INTO saldo FROM tarjetas T WHERE T.id_tarjeta = id_tarjeta;
-			SELECT 'cierre' AS operacion, tiempo_transcurrido, saldo, fecha_apertura, hora_apertura, fecha_sal, hora_sal;
+            /* Actualizacion de saldo */            
+            UPDATE tarjetas T
+            SET T.saldo = CASE
+                WHEN nuevo_saldo >= -999.99
+                    THEN CAST(nuevo_saldo AS DECIMAL(5,2))
+                ELSE -999.99
+            END
+            WHERE T.id_tarjeta = id_tarjeta;
+			SELECT 'cierre' AS operacion, tiempo_transcurrido, CAST(nuevo_saldo AS DECIMAL(5,2)) AS saldo, fecha_apertura, hora_apertura, fecha_sal, hora_sal;
         END IF;   
     ELSE
         IF NOT EXISTS (SELECT * FROM tarjetas T WHERE T.id_tarjeta = id_tarjeta) THEN
@@ -268,15 +275,6 @@ END; !
 delimiter ;
 
 /* EVENT */
-/* 
-    Se ejecuta todos los dias a las 20hs, su funcion es cerrar los estacionamientos abiertos cuando el
-    parquimetro deja de operar. De esta forma se cumple con la franja horaria de 8hs a 20hs.
-    Se implemento para evitar saldos muy grandes, los cuales podrian superar los 3 digitos enteros y causar 
-    un error en la base de datos, ya que el saldo de una tarjeta se define como decimal(5,2) y depende
-    del tiempo transcurrido.
-
-    Para que este funcione se debe ejcutar la siguiente instrucción: SET GLOBAL event_scheduler=ON;
- */
 
 delimiter !
 
