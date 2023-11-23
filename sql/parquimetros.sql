@@ -220,9 +220,8 @@ BEGIN
 
     /* Si existen en la BD la tarjeta y el parquimetro */    
     IF EXISTS (SELECT * FROM tarjetas T WHERE T.id_tarjeta = id_tarjeta) AND EXISTS (SELECT * FROM parquimetros P WHERE P.id_parq = id_parq) THEN
-        SELECT T.saldo INTO saldo FROM tarjetas T WHERE T.id_tarjeta = id_tarjeta;
+        SELECT T.saldo INTO saldo FROM tarjetas T WHERE T.id_tarjeta = id_tarjeta FOR UPDATE;
         SELECT TT.descuento INTO descuento FROM tarjetas T, tipos_tarjeta TT WHERE T.id_tarjeta = id_tarjeta AND T.tipo = TT.tipo;
-        SELECT U.tarifa INTO tarifa FROM ubicaciones U NATURAL JOIN parquimetros P WHERE P.id_parq = id_parq;
 
         /* Si no tiene un estacionamiento abierto */
         IF NOT EXISTS (SELECT 1 FROM estacionamientos E 
@@ -231,6 +230,7 @@ BEGIN
             THEN
                 /* Si tiene saldo disponible */
                 IF saldo > 0 THEN                     
+                    SELECT U.tarifa INTO tarifa FROM ubicaciones U NATURAL JOIN parquimetros P WHERE P.id_parq = id_parq;
                     SET tiempo = saldo / (tarifa * (1 - descuento));
                     SET fecha_apertura = CURDATE();
                     SET hora_apertura = CURTIME();
@@ -244,8 +244,19 @@ BEGIN
                 END IF;
         /* Si tiene un estacionamiento abierto */
 		ELSE
-			SELECT E.fecha_ent INTO fecha_apertura FROM estacionamientos E WHERE E.id_tarjeta = id_tarjeta AND E.fecha_sal IS NULL AND E.hora_sal IS NULL;
-            SELECT E.hora_ent INTO hora_apertura FROM estacionamientos E WHERE E.id_tarjeta = id_tarjeta AND E.fecha_sal IS NULL AND E.hora_sal IS NULL;
+			SELECT E.fecha_ent INTO fecha_apertura FROM estacionamientos E WHERE E.id_tarjeta = id_tarjeta AND E.fecha_sal IS NULL AND E.hora_sal IS NULL FOR UPDATE;
+            SELECT E.hora_ent INTO hora_apertura FROM estacionamientos E WHERE E.id_tarjeta = id_tarjeta AND E.fecha_sal IS NULL AND E.hora_sal IS NULL FOR UPDATE;
+            /* CORRECIÓN TARIFA */
+            SELECT U.tarifa INTO tarifa
+            FROM ubicaciones U NATURAL JOIN (
+                SELECT P.calle, P.altura
+                FROM parquimetros P NATURAL JOIN (
+                    SELECT E.id_parq 
+                    FROM estacionamientos E 
+                    WHERE E.id_tarjeta = id_tarjeta AND E.fecha_sal IS NULL AND E.hora_sal IS NULL
+                ) Es
+            ) PE FOR UPDATE;
+
 			SET tiempo_transcurrido = TIMESTAMPDIFF(MINUTE, CONCAT(fecha_apertura, ' ', hora_apertura), NOW());
             SET fecha_sal = CURDATE();
             SET hora_sal = CURTIME();
